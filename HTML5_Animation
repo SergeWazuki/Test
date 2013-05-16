@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html>
+  <head>
+		<meta charset="UTF-8" />
+		<title>HTML5 Canvas: Animation Demo</title>
+		<style type="text/css">
+			.container {
+				margin: 20px auto;
+				overflow: hidden;
+				width: 804px;
+			}
+			.ctrlPnl {
+				background-color: #212121;
+				border-radius: 10px 10px 0 0;
+				padding: 10px 0;
+				text-align: center;
+			}
+			.ctrlPnl input {
+				margin-right: 5px;
+			}
+			.ctrlPnl label {
+				color: white;
+				margin-right: 10px;
+			}
+			#canvas {
+				border: black 2px solid;
+				width: 800px;
+				height: 600px;
+				background-color: #FAF7F8;
+			}
+		</style>
+	</head>
+	<body>
+		<section>
+		<div class="container">
+			<div class="ctrlPnl">
+				<input type="radio" name="mode" onchange="PLAY = false" /><label>Pause</label>
+				<input type="radio" name="mode" onchange="PLAY = true" checked /><label>Play</label>
+			</div>
+			<canvas id="canvas" width="800" height="600">
+				Your browser does not support HTML5 Canvas.
+			</canvas>
+			</div>
+		</section>
+
+		<script type="text/javascript">
+
+			var WIDTH; 					        		// Width of the canvas
+			var HEIGHT; 						    	// Height of the canvas
+			var CANVAS_LEFT;						// Left offset of the canvas
+			var CANVAS_RIGHT;						// Right offset of the canvas
+			var CANVAS_TOP;						// Top offset of the canvas
+			var CANVAS_BOTTOM;					// Bottom offset of the canvas
+			var INTERVAL = 10; 				    		// How often to redraw the canavas (ms)
+			
+			var PLAY = true;
+
+			var BUBBLE_RADIUS = 20;            		 	// The radius of the bubble
+			var BUBBLE_DIAMETER = BUBBLE_RADIUS * 2;    // The diameter of the bubble
+			var OPACITY;
+
+			var canvas;                         		// Reference to the canvas element
+			var ctx;                            		// Reference to the context used for drawing
+			var isDragging = false;             // Indicating whether or not the user is dragging a tile
+			var mouseX; 					    // Current mouse X coordinate
+			var mouseY;                         // Current mouse Y coordinate
+			var lastMouseX = 0;                 // The last seen mouse X coordinate
+			var lastMouseY = 0;                 // the last seen mouse Y coordinate
+			var changeInX;                      // The difference between the last and current mouse X coordinate
+			var changeInY;                      // The difference between the last and current mouse Y coordinate
+
+			var redrawCanvas = false;           // Indicates whether or not the canvas needs to be redrawn	
+
+			var selectedBubbles = [];           // Stores all tiles currently on the canvas
+			var bubbles = [];                   // Stores the tiles not currently on the canvas 	
+
+			var offX;                           // Indicates that the mouse has moved off the canvas on the x axis
+			var offY;                           // Indicates that the mouse has moved off the canvas on the y axis
+												
+			var numOfBubbles = 5;
+			var speed = 5;
+			
+			function Bubble() {
+				this.x = 0;
+				this.y = 0;
+				this.a = 0;
+				this.b = 0;
+				this.r = BUBBLE_RADIUS;
+				this.color = 'black'; // Default color is black
+				this.opacity = OPACITY;
+				this.selected = false;
+			}
+			
+			function random_color(format)
+			{
+				var rint = Math.round(0xffffff * Math.random());
+				switch(format)
+				{
+					case 'hex':
+						return ('#0' + rint.toString(16)).replace(/^#0([0-9a-f]{6})$/i, '#$1');
+						break;
+
+					case 'rgb':
+						return 'rgb(' + (rint >> 16) + ',' + (rint >> 8 & 255) + ',' + (rint & 255) + ')';
+						break;
+						
+					case 'rainbow':					
+						var color = ['red','orange','yellow','green','blue','violet','purple'];
+						return color[parseInt(Math.random() * color.length)];
+
+					default:
+						return rint;
+						break;
+				}
+			}
+			
+			function randomPosition(dimensionLength)
+			{
+				return Math.random() * (dimensionLength - BUBBLE_DIAMETER)  + BUBBLE_RADIUS;
+			}
+			
+			function randomSpeed(speed)
+			{
+				return (Math.random()*2-1) * Math.random()*speed;
+			}
+
+			if (window.attachEvent) {
+				window.attachEvent('onload', init);
+			} else {
+				if(window.onload) {
+				var curronload = window.onload;
+				var newonload = function() {
+					curronload();
+					init();
+				};
+				window.onload = newonload;
+				} else {
+					window.onload = init;
+				}
+			}
+			
+			function init() {
+				// Setup the global variables				
+				canvas = document.getElementById("canvas");
+				HEIGHT = canvas.height;
+				WIDTH = canvas.width;
+				CANVAS_LEFT = canvas.offsetLeft;
+				CANVAS_RIGHT = canvas.offsetWidth;
+				CANVAS_TOP = canvas.offsetTop;
+				CANVAS_BOTTOM = canvas.offsetHeight;
+				OPACITY = 0.5;
+				
+				ctx = canvas.getContext("2d");
+				
+				// Setup the bubble arrays
+				initBubbles();
+				
+				// Wire up the mouse event handlers
+				canvas.onmousedown = mouseDown;
+				canvas.onmouseup = mouseUp;
+				
+				// Set how often the draw method will be called
+				setInterval(draw, INTERVAL);
+				
+				needsRedraw();
+			}
+			
+			function initBubbles() {
+				
+				for (var i = 0; i < numOfBubbles; i++) {
+					var bubble = new Bubble;
+					bubble.x = randomPosition(WIDTH);
+					bubble.y = randomPosition(HEIGHT);
+					bubble.a = randomSpeed(speed);
+					bubble.b = randomSpeed(speed);
+					bubble.color = random_color('hex');
+
+					// Add the bubble to the bubbles array
+					bubbles.push(bubble);
+				}
+			}
+			
+			// Indicate that the canvas needs to be redrawn
+			function needsRedraw() {
+				redrawCanvas = true;
+			}
+
+			// Draw the various objects on the canvas
+			function draw() {
+				if (PLAY)
+				{
+					// Only draw the canvas if it is not valid
+					if (redrawCanvas) {
+						clear(ctx);
+						
+						for (var i = 0; i < bubbles.length; i++)
+						{
+							drawBubble(ctx, bubbles[i], true);
+						}
+					}
+				}
+			}
+			
+			// Draw single bubble
+			function drawBubble(ctx, bubble, hasShadow) {
+				bubble.x += bubble.a;
+				bubble.y += bubble.b;
+				
+				if(bubble.x - bubble.r <= 0 || bubble.x + bubble.r >= WIDTH)
+				{
+					bubble.a *= -1;
+				}
+				
+				if(bubble.y - bubble.r <= 0 || bubble.y + bubble.r >= HEIGHT)
+				{
+					bubble.b *= -1;
+				}
+				
+				var grd = ctx.createRadialGradient(bubble.x, bubble.y, (bubble.r * 0.1), bubble.x, bubble.y, bubble.r);
+				grd.addColorStop(0.0, bubble.color);
+				grd.addColorStop(1.0, "white");
+				ctx.beginPath();
+				ctx.arc(bubble.x, bubble.y, bubble.r, Math.PI * 0, Math.PI * 2);
+				ctx.closePath();
+				
+				// Fill bubble
+				ctx.globalAlpha = bubble.opacity;
+				if(hasShadow) {
+					ctx.shadowColor = "#bbbbbb";
+					ctx.shadowBlur = 20;
+					ctx.shadowOffsetX = 15;
+					ctx.shadowOffsetY = 15;
+				}
+				ctx.fillStyle = grd;
+				ctx.fill();
+			}
+			
+			// Clears the canvas
+			function clear(ctx) {
+				ctx.clearRect(0, 0, WIDTH, HEIGHT);
+			}
+
+			function mouseDown(e){
+				if (e.pageX < posx + 15 + canvas.offsetLeft && e.pageX > posx - 15 +
+				canvas.offsetLeft && e.pageY < posy + 15 + canvas.offsetTop &&
+				e.pageY > posy -15 + canvas.offsetTop){
+					posx = e.pageX - canvas.offsetLeft;
+					posy = e.pageY - canvas.offsetTop;
+					isDragging = true;
+					canvas.onmousemove = mouseMove;
+				}
+			}
+
+			function mouseUp(){
+				isDragging = false;
+				canvas.onmousemove = null;
+			}
+		</script>
+	</body>
+</html>
